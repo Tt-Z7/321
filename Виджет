@@ -1,0 +1,174 @@
+const widget = document.getElementById(w.general.renderTo);
+const items = w.data.primaryData.items;
+
+const plan = items[0].values[0];
+const fact = items[0].values[1];
+
+widget.innerHTML = '';
+
+const root = document.createElement('div');
+root.style.width = '100%';
+root.style.height = '100%';
+root.style.position = 'relative';
+widget.appendChild(root);
+
+// углы
+const START = 90;
+const END = 260;
+const RANGE = END - START;
+
+// utils
+function polar(cx, cy, r, a) {
+    const rad = a * Math.PI / 180;
+    return {
+        x: cx + r * Math.cos(rad),
+        y: cy + r * Math.sin(rad)
+    };
+}
+
+function arc(cx, cy, r, a1, a2, sweep = 1) {
+    const p1 = polar(cx, cy, r, a1);
+    const p2 = polar(cx, cy, r, a2);
+    const large = Math.abs(a2 - a1) <= 180 ? 0 : 1;
+
+    return `M ${p1.x} ${p1.y} 
+            A ${r} ${r} 0 ${large} ${sweep} ${p2.x} ${p2.y}`;
+}
+
+// render
+function render() {
+    const w = root.clientWidth;
+    const h = root.clientHeight;
+    const size = Math.min(w, h);
+
+    const cx = size * 0.45;
+    const cy = size * 0.5;
+
+    const rOut = size * 0.38;
+    const rIn = size * 0.28;
+    const stroke = size * 0.05;
+
+    const percent = plan === 0 ? 0 : fact / plan;
+
+    const factEnd = START + Math.min(percent, 1) * RANGE;
+
+    const diff = fact - plan;
+    const diffPercent = plan === 0 ? 0 : diff / plan * 100;
+
+    // точки
+    const pFact = polar(cx, cy, rOut, factEnd);
+    const pPlan = polar(cx, cy, rIn, END);
+
+    root.innerHTML = `
+    <div style="width:100%;height:100%;position:relative;font-family:sans-serif;">
+        
+        <svg viewBox="0 0 ${size} ${size}">
+            
+            <!-- план -->
+            <path d="${arc(cx, cy, rIn, START, END)}"
+                  stroke="#ddd"
+                  stroke-width="${stroke}"
+                  fill="none"
+                  stroke-linecap="round"/>
+
+            ${
+                percent <= 1
+                ? `
+                <!-- факт -->
+                <path id="factArc"
+                      d="${arc(cx, cy, rOut, END,END + extraAngel,0)}"
+                      stroke="#4a90e2"
+                      stroke-width="${stroke}"
+                      fill="none"
+                      stroke-linecap="round"/>
+
+                <!-- недовыполнение (ВНУТРИ ДО 260) -->
+                <path d="${arc(cx, cy, rOut, factEnd, END,1)}"
+                      stroke="#e74c3c"
+                      stroke-width="${stroke}"
+                      fill="none"
+                      stroke-linecap="round"/>
+                `
+                : `
+                <!-- факт до конца шкалы -->
+                <path id="factArc"
+                      d="${arc(cx, cy, rOut, START, END)}"
+                      stroke="#4a90e2"
+                      stroke-width="${stroke}"
+                      fill="none"
+                      stroke-linecap="round"/>
+
+                <!-- перевыполнение (ПОСЛЕ 260) -->
+                <path d="${arc(
+                    cx,
+                    cy,
+                    rOut,
+                    END,
+                    END + Math.min((percent - 1) * RANGE, RANGE * 0.6)
+                )}"
+                      stroke="#2ecc71"
+                      stroke-width="${stroke}"
+                      fill="none"
+                      stroke-linecap="round"/>
+                `
+            }
+
+        </svg>
+
+        <!-- центр -->
+        <div style="
+            position:absolute;
+            top:50%;
+            left:${cx / size * 100}%;
+            transform:translate(-50%, -50%);
+            text-align:center;
+            font-size:${size * 0.055}px;
+            width:${size * 0.5}px;
+        ">
+            Показатели выполнения плана
+        </div>
+
+        <!-- ФАКТ -->
+        <div style="
+            position:absolute;
+            left:${pFact.x / size * 100}%;
+            top:${pFact.y / size * 100}%;
+            transform:translate(8px,-8px);
+            font-size:${size * 0.045}px;
+        ">
+            ${fact}
+Факт
+        </div>
+
+        <!-- ПЛАН -->
+        <div style="
+            position:absolute;
+            left:${pPlan.x / size * 100}%;
+            top:${pPlan.y / size * 100}%;
+
+transform:translate(8px,4px);
+            font-size:${size * 0.045}px;
+        ">
+            ${plan} План
+        </div>
+
+        <!-- разница -->
+        <div style="
+            position:absolute;
+            top:${(cy + rOut + size*0.07) / size * 100}%;
+            left:${cx / size * 100}%;
+            transform:translateX(-50%);
+            font-size:${size * 0.055}px;
+            font-weight:bold;
+            color:${diff >= 0 ? '#2ecc71' : '#e74c3c'};
+        ">
+            ${diff >= 0 ? '+' : ''}${diff} (${diffPercent.toFixed(1)}%)
+        </div>
+
+    </div>
+    `;
+}
+
+// init
+render();
+new ResizeObserver(render).observe(root);
